@@ -44,15 +44,32 @@ duplicates without auto-merging.
    - Recompute `eligible` per `filters.yaml` (server-side filters
      leaked a few outliers in M1; this catches them).
    - Run dedup classifier.
-5. Update `runs` log per source category (`enrich`).
+5. Update `runs` log per source category (`enrich`, `details`).
+6. Add `aptos_sp/scrapers/zap/detail.py` + `aptos_sp/cli/details.py`:
+   - `curl_cffi` HTML fetch per listing URL (Cloudflare passes the
+     same way it does for the listings API).
+   - Parse description / anunciante_code / criado_em / endereco /
+     lat-lng from stable `data-testid` selectors and the embedded
+     Google Maps iframe.
+   - Overwrite the API-provided `descricao` + `endereco` with the
+     detail-page values (more complete; what the operator sees).
+   - Pacing 1.5–4s between fetches; resumable via
+     `detail_fetched_at < last_seen`; `--limit N` for incremental
+     runs; 404/410 stamp `detail_fetched_at` to skip expired
+     listings on rerun.
 
 ## Definition of done
 
 - After `uv run enrich`, every newly-scraped row has its qualitative
   columns populated (or NULL — ADR-007 prefers false negatives).
 - `v_possible_dups` surfaces the flagged candidates.
+- After `uv run details`, every fetched row has `descricao`,
+  `endereco`, `anunciante_code`, `criado_em`, and (when the broker
+  exposed the street number) `address_lat`/`address_lng` populated.
 - Unit tests cover normalization edge cases (acentos, prefixos, ruas
-  com número escondido), keyword tri-state, dedup tiers + idempotency.
+  com número escondido), keyword tri-state, dedup tiers +
+  idempotency, and the detail-page parser (description, code, date,
+  endereco, lat/lng, partial-HTML fallback).
 
 ## Open questions
 
@@ -71,9 +88,10 @@ duplicates without auto-merging.
 - **2026-05-04 — Schema migration via `PRAGMA table_info` inspection
   in `db/conn.py`.** SQLite has no `ALTER TABLE ADD COLUMN IF NOT
   EXISTS`, so `_migrate(conn)` reads existing column names and adds
-  what's missing. Append-only — never rename or drop here. Three
-  columns added: `descricao`, `amenities` (JSON-encoded list),
-  `extracted_at_hash`.
+  what's missing. Append-only — never rename or drop here. Six
+  columns added across the milestone: `descricao`, `amenities`
+  (JSON-encoded list), `extracted_at_hash`, `anunciante_code`,
+  `criado_em`, `detail_fetched_at`.
 - **2026-05-04 — Idempotency keyed on `extracted_at_hash` vs
   `raw_html_hash`.** Re-extraction skips rows whose hash already
   matches the last extract. Re-running enrich after no scrape changes
@@ -150,17 +168,38 @@ duplicates without auto-merging.
 
 After `uv run enrich`:
 
-- **1034 rows extracted, 952 eligible.** Per criterion: ar_condicionado
-  670 True / 364 None; lavabo 242 True / 792 None; cozinha_layout
-  detected on 129 (108 americana + 21 integrada); chuveiro_gas 26
-  True (under-detected — most listings don't mention water heating);
-  vidro_anti_ruido 1 True (correctly rare).
-- **84 strong + 17 weak dups flagged** in `v_possible_dups` (down from
-  597 before the street-number guard). Remaining flags are plausible
-  republishes — same listing posted twice by different brokers with
-  inconsistent address formatting.
+- **1034 rows extracted, 952 eligible.** Per criterion:
+  ar_condicionado 670 True / 364 None; lavabo 242 True / 792 None;
+  cozinha_layout detected on 129 (108 americana + 21 integrada);
+  chuveiro_gas 26 True (under-detected — most listings don't mention
+  water heating); vidro_anti_ruido 1 True (correctly rare).
+- **84 strong + 17 weak dups flagged** in `v_possible_dups` (down
+  from 597 before the street-number guard). Remaining flags are
+  plausible republishes — same listing posted twice by different
+  brokers with inconsistent address formatting.
 - Idempotent on rerun: `extracted=0 normalized=0` when nothing
   changed.
-- 77/77 unit tests pass (19 ZAP-API + 6 persist + 24 normalize +
-  18 extract + 10 dedup).
+
+After `uv run details --limit 107` (10% sample to validate before the
+full backfill):
+
+- **107/107 (100%)** rows have `descricao`, `anunciante_code`,
+  `criado_em`, `endereco`.
+- **82/107 (76.6%)** rows have `address_lat` + `address_lng` — the
+  remaining 23% are listings whose broker hid the street number on
+  the page, so ZAP renders the neighborhood centroid instead of
+  rooftop-precise coords (the missing-number share matches the
+  missing-coords share exactly, confirming this isn't a parser gap).
+- All 107 `anunciante_code` values unique; `criado_em` ranges
+  2023-03 → 2026-05 (some long-listed properties); description
+  length 100 of 107 in the 300–3000 char range.
+- 0 errors, 0 expired listings (404/410), ~3 minutes wall clock at
+  1.5–4s pacing.
+- Full 1034-row backfill deferred to operator on demand — same CLI,
+  same pacing, no code change required.
+
+Quality:
+
+- 88/88 unit tests pass (19 ZAP-API + 6 persist + 24 normalize +
+  18 extract + 10 dedup + 11 detail-parser).
 - `basedpyright .` 0 errors; `ruff check + format` clean.
