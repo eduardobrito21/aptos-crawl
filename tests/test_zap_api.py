@@ -172,6 +172,17 @@ def test_parse_response_partial_pricing():
     assert no_iptu.total == pytest.approx(5500 + 950)
 
 
+def test_parse_response_extracts_description_and_amenities():
+    by_id = {stub.source_id: stub for stub in parse_response(_payload(), bairro="Pinheiros")}
+    full = by_id["2510042000-30"]
+    assert full.descricao is not None
+    assert "chuveiro a gás" in full.descricao
+    assert full.amenities == ["AIR_CONDITIONING", "FURNISHED", "LAVABO", "GYM"]
+    sparse = by_id["missing-prices"]
+    assert sparse.descricao is None
+    assert sparse.amenities == []
+
+
 def test_parse_response_handles_missing_fields_gracefully():
     by_id = {stub.source_id: stub for stub in parse_response(_payload(), bairro="Pinheiros")}
     sparse = by_id["missing-prices"]

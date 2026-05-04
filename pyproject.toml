@@ -15,6 +15,8 @@ dependencies = [
 
 [project.scripts]
 scrape = "aptos_sp.cli.scrape:main"
+details = "aptos_sp.cli.details:main"
+enrich = "aptos_sp.cli.enrich:main"
 
 [dependency-groups]
 dev = [

@@ -5,6 +5,8 @@
         {
           "listing": {
             "id": "2510042000-30",
+            "description": "Lindo apartamento em Pinheiros, com chuveiro a gás, ar condicionado split em todos os ambientes e cozinha americana integrada à sala. Possui lavabo e vidro acústico nas janelas.",
+            "amenities": ["AIR_CONDITIONING", "FURNISHED", "LAVABO", "GYM"],
             "address": {
               "street": "Rua dos Pinheiros",
               "streetNumber": "500",
@@ -27,6 +29,8 @@
         {
           "listing": {
             "id": "2511099000-15",
+            "description": "Studio com cozinha isolada e chuveiro elétrico. Sem ar condicionado.",
+            "amenities": ["FURNISHED", "GYM"],
             "address": {
               "street": "Rua Cardeal Arcoverde",
               "streetNumber": "1234",
@@ -49,6 +53,8 @@
         {
           "listing": {
             "id": "missing-prices",
+            "description": null,
+            "amenities": [],
             "address": {"neighborhood": "Pinheiros", "city": "São Paulo"},
             "usableAreas": [],
             "bedrooms": [],

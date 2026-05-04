@@ -9,6 +9,7 @@ Returns a `PersistStats` so the CLI can update the `runs` row with
 counts.
 """
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -83,13 +84,15 @@ def _upsert_one(
     before: int | None,
 ) -> int:
     """Run the parameterized upsert. Returns the row's `aptos.id`."""
+    amenities_json = json.dumps(stub.amenities, ensure_ascii=False) if stub.amenities else None
     cur = conn.execute(
         """
         INSERT INTO aptos (
             source, source_id, url, bairro, endereco,
             area_m2, quartos, suites, banheiros, vagas,
+            descricao, amenities,
             scraped_at, last_seen, raw_html_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(source, source_id) DO UPDATE SET
             url = excluded.url,
             bairro = excluded.bairro,
@@ -99,6 +102,8 @@ def _upsert_one(
             suites = COALESCE(excluded.suites, aptos.suites),
             banheiros = COALESCE(excluded.banheiros, aptos.banheiros),
             vagas = COALESCE(excluded.vagas, aptos.vagas),
+            descricao = COALESCE(excluded.descricao, aptos.descricao),
+            amenities = COALESCE(excluded.amenities, aptos.amenities),
             last_seen = excluded.last_seen,
             raw_html_hash = excluded.raw_html_hash
         """,
@@ -113,6 +118,8 @@ def _upsert_one(
             stub.suites,
             stub.banheiros,
             stub.vagas,
+            stub.descricao,
+            amenities_json,
             stub.scraped_at,
             now,
             stub.raw_html_hash,
