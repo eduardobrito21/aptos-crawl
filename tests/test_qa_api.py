@@ -108,21 +108,23 @@ def test_build_body_apartment_only():
 
 
 def test_parse_response_returns_three_stubs():
-    stubs, total = parse_response(_payload(), bairro="Pinheiros")
+    stubs, total = parse_response(_payload())
     assert len(stubs) == 3
     assert total == 99
     assert {s.source for s in stubs} == {"quintoandar"}
-    assert {s.bairro for s in stubs} == {"Pinheiros"}
+    # Bairro now comes from the API's `neighbourhood` field; the
+    # scraper canonicalizes against `config.bairros` afterward.
+    assert all(s.bairro == "Pinheiros" for s in stubs)
 
 
 def test_parse_response_url_points_at_canonical_detail():
-    stubs, _ = parse_response(_payload(), bairro="Pinheiros")
+    stubs, _ = parse_response(_payload())
     for stub in stubs:
         assert stub.url == f"https://www.quintoandar.com.br/imovel/{stub.source_id}/"
 
 
 def test_parse_response_extracts_structured_fields():
-    stubs, _ = parse_response(_payload(), bairro="Pinheiros")
+    stubs, _ = parse_response(_payload())
     by_id = {stub.source_id: stub for stub in stubs}
     sample = by_id["893327546"]
     # Captured-fixture values; if QA changes them, refresh the fixture.
@@ -139,7 +141,7 @@ def test_parse_response_extracts_structured_fields():
 
 
 def test_parse_response_carries_amenities_and_description():
-    stubs, _ = parse_response(_payload(), bairro="Pinheiros")
+    stubs, _ = parse_response(_payload())
     by_id = {stub.source_id: stub for stub in stubs}
     sample = by_id["893327546"]
     assert "AR_CONDICIONADO" in sample.amenities
@@ -148,30 +150,50 @@ def test_parse_response_carries_amenities_and_description():
 
 
 def test_parse_response_handles_missing_hits():
-    assert parse_response({}, bairro="Pinheiros") == ([], None)
-    assert parse_response({"hits": {}}, bairro="Pinheiros") == ([], None)
+    assert parse_response({}) == ([], None)
+    assert parse_response({"hits": {}}) == ([], None)
 
 
 def test_parse_response_extracts_total_int_form():
     """Some endpoints return `total` as a bare int rather than the
     `{"value": N}` ES shape — handle both."""
     payload = {"hits": {"total": 42, "hits": []}}
-    _, total = parse_response(payload, bairro="Pinheiros")
+    _, total = parse_response(payload)
     assert total == 42
 
 
-def test_parse_response_skips_hits_without_id():
-    """Defensive: a hit with no `_source.id` shouldn't crash the parser
-    or produce a malformed stub."""
+def test_parse_response_skips_hits_without_id_or_neighbourhood():
+    """Defensive: a hit with no `_source.id` or no `neighbourhood`
+    shouldn't crash the parser or produce a malformed stub. Without
+    `neighbourhood` or `regionName` we can't tag the bairro at all,
+    so the parser drops the listing."""
+    payload = {
+        "hits": {
+            "total": {"value": 3},
+            "hits": [
+                {"_id": "x", "_source": {}},
+                {"_id": "y", "_source": {"id": "1"}},  # no bairro
+                {"_id": "z", "_source": {"id": "2", "neighbourhood": "Pinheiros"}},
+            ],
+        }
+    }
+    stubs, _ = parse_response(payload)
+    assert len(stubs) == 1
+    assert stubs[0].source_id == "2"
+    assert stubs[0].bairro == "Pinheiros"
+
+
+def test_parse_response_falls_back_to_regionName():
+    """When the API only sets `regionName` (not `neighbourhood`),
+    use that — the scraper still canonicalizes against config."""
     payload = {
         "hits": {
             "total": {"value": 1},
             "hits": [
-                {"_id": "x", "_source": {}},
-                {"_id": "y", "_source": {"id": "1"}},
+                {"_id": "a", "_source": {"id": "5", "regionName": "Itaim Bibi"}},
             ],
         }
     }
-    stubs, _ = parse_response(payload, bairro="Pinheiros")
+    stubs, _ = parse_response(payload)
     assert len(stubs) == 1
-    assert stubs[0].source_id == "1"
+    assert stubs[0].bairro == "Itaim Bibi"

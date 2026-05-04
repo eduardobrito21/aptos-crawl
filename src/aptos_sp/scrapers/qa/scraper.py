@@ -6,6 +6,12 @@ pagination via `offset` + `total.value`. Same `curl_cffi` chrome
 impersonation as ZAP — the endpoint is anonymous when the TLS handshake
 matches Chrome's wire fingerprint (ADR-012).
 
+The slug filter is fuzzy-radius: a `vila-olimpia-...` query returns
+listings in Vila Olímpia *and* adjacent neighborhoods (Itaim, Cidade
+Monções, …). We canonicalize each listing's bairro from the API's
+`neighbourhood` field against `config.bairros`, drop non-target
+listings, and dedupe by `source_id` across all bairro queries.
+
 Per ADR-005 §3, no anti-detection arms race: polite pacing between
 requests, no fingerprint rotation. Per ADR-005 §1, reuses the
 `Scraper` interface unchanged.
@@ -13,6 +19,7 @@ requests, no fingerprint rotation. Per ADR-005 §1, reuses the
 
 import random
 import time
+import unicodedata
 
 from aptos_sp.config.filters import Filters, FiltersConfig
 from aptos_sp.scrapers.base import ListingDetail, ListingStub
@@ -33,17 +40,32 @@ class QaScraper:
     source = "quintoandar"
 
     def list_listings(self, config: FiltersConfig) -> list[ListingStub]:
+        targets = list(config.bairros)
+        target_norm = {normalize_bairro(t): t for t in targets}
+        seen_ids: set[str] = set()
         results: list[ListingStub] = []
-        for i, bairro in enumerate(config.bairros):
+        for i, bairro in enumerate(targets):
             if i > 0:
                 time.sleep(random.uniform(*INTER_BAIRRO_DELAY_RANGE))
-            results.extend(self._fetch_bairro(bairro, config.filters))
+            for stub in self._fetch_bairro(bairro, config.filters):
+                if stub.source_id in seen_ids:
+                    # Same listing already attributed via an adjacent
+                    # bairro's slug query — keep the first attribution.
+                    continue
+                canonical = target_norm.get(normalize_bairro(stub.bairro))
+                if canonical is None:
+                    # API placed this listing in a non-target bairro;
+                    # the slug query was fuzzy and bled into adjacent
+                    # neighborhoods. Drop it.
+                    continue
+                stub.bairro = canonical
+                seen_ids.add(stub.source_id)
+                results.append(stub)
         return results
 
     def _fetch_bairro(self, bairro: str, filters: Filters) -> list[ListingStub]:
         slug = slug_for(bairro)
         out: list[ListingStub] = []
-        seen_ids: set[str] = set()
         last_total: int | None = None
 
         for page in range(1, MAX_PAGES + 1):
@@ -59,31 +81,23 @@ class QaScraper:
                 # kicks in after 3 consecutive run failures.
                 raise
 
-            stubs, total = parse_response(payload, bairro=bairro)
+            stubs, total = parse_response(payload)
             if last_total is None and total is not None:
                 last_total = total
                 pages_for_count = max(1, -(-total // PAGE_SIZE))
                 print(
-                    f"[qa/{bairro}] total={total}, "
-                    f"will paginate to page {min(pages_for_count, MAX_PAGES)}",
+                    f"[qa/{bairro}] reported_total={total}, "
+                    f"will paginate up to page {min(pages_for_count, MAX_PAGES)} "
+                    "(reported_total over-counts; real tail decides stop)",
                     flush=True,
                 )
 
-            new_this_page = 0
-            for stub in stubs:
-                if stub.source_id in seen_ids:
-                    continue
-                seen_ids.add(stub.source_id)
-                out.append(stub)
-                new_this_page += 1
+            out.extend(stubs)
 
-            # Stop conditions: empty page, returned fewer than the page
-            # size (tail of results), or we've hit the known total.
-            if not stubs:
-                break
-            if last_total is not None and len(seen_ids) >= last_total:
-                break
-            if len(stubs) < PAGE_SIZE:
+            # Stop on the natural tail. The reported `total` over-counts
+            # (covers the slug's fuzzy-radius region, not just the
+            # bairro), so we don't trust it as a stop condition.
+            if not stubs or len(stubs) < PAGE_SIZE:
                 break
 
         return out
@@ -95,3 +109,12 @@ class QaScraper:
         # later want full broker prose, we'll add a per-listing fetch
         # mirroring ZAP's `cli/details.py`.
         raise NotImplementedError("QA detail-page scraping is deferred.")
+
+
+def normalize_bairro(name: str) -> str:
+    """Lowercase + strip accents for case/diacritic-insensitive bairro
+    matching. QA returns "Vila Olímpia" sometimes, "Vila Olimpia"
+    other times; both should canonicalize the same."""
+    decomposed = unicodedata.normalize("NFKD", name)
+    no_accents = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return no_accents.strip().lower()

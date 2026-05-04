@@ -111,8 +111,14 @@ def build_body(
     }
 
 
-def parse_response(payload: dict[str, Any], *, bairro: str) -> tuple[list[ListingStub], int | None]:
+def parse_response(payload: dict[str, Any]) -> tuple[list[ListingStub], int | None]:
     """Convert apigw response → typed ListingStubs + total count.
+
+    `stub.bairro` is set to the API's `neighbourhood` (raw value, e.g.
+    `"Vila Olímpia"`, `"Brooklin"`). The QA slug query is fuzzy-radius
+    — a `vila-olimpia` query returns adjacent neighborhoods too — so
+    the scraper canonicalizes against `config.bairros` and drops
+    listings that don't match a target bairro.
 
     Response shape (ElasticSearch-style):
         { "hits": { "total": {"value": N, "relation": "Eq"}, "hits": [
@@ -125,7 +131,9 @@ def parse_response(payload: dict[str, Any], *, bairro: str) -> tuple[list[Listin
         source = hit.get("_source") if isinstance(hit, dict) else None
         if not isinstance(source, dict) or not source.get("id"):
             continue
-        stubs.append(_to_stub(source, bairro))
+        stub = _to_stub(source)
+        if stub is not None:
+            stubs.append(stub)
     return stubs, _extract_total(payload)
 
 
@@ -141,7 +149,7 @@ def _extract_total(payload: dict[str, Any]) -> int | None:
     return None
 
 
-def _to_stub(source: dict[str, Any], bairro: str) -> ListingStub:
+def _to_stub(source: dict[str, Any]) -> ListingStub | None:
     listing_id = str(source["id"])
     raw = json.dumps(source, sort_keys=True, ensure_ascii=False)
     description = source.get("shortRentDescription")
@@ -153,12 +161,18 @@ def _to_stub(source: dict[str, Any], bairro: str) -> ListingStub:
     condo_iptu = _to_float(source.get("iptuPlusCondominium"))
 
     address = _address_str(source)
+    api_bairro = source.get("neighbourhood") or source.get("regionName") or ""
+    if not api_bairro:
+        # The API occasionally returns hits without a neighbourhood;
+        # without one we can't canonicalize against `config.bairros`,
+        # so skip rather than guess.
+        return None
 
     return ListingStub(
         source="quintoandar",
         source_id=listing_id,
         url=f"{_DETAIL_URL_BASE}{listing_id}/",
-        bairro=bairro,
+        bairro=str(api_bairro),
         endereco=address,
         area_m2=_to_float(source.get("area")),
         quartos=_to_int(source.get("bedrooms")),
