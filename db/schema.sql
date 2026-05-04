@@ -30,6 +30,18 @@ CREATE TABLE IF NOT EXISTS aptos (
     cozinha_layout TEXT,                    -- 'isolada' | 'americana' | 'integrada' | NULL
     lavabo BOOLEAN,
     internet_fibra TEXT,
+    -- Source text for qualitative extraction (ADR-007). Filled at scrape
+    -- time and re-read by `pipeline/extract.py`; storing it lets enrich
+    -- re-run without re-scraping when keywords.yaml changes.
+    descricao TEXT,
+    amenities TEXT,                         -- JSON array of source amenity codes
+    extracted_at_hash TEXT,                 -- value of raw_html_hash at last extract
+    -- Detail-page enrichment, populated by `cli/details.py`. The
+    -- listings API gives us description/amenities for free; the detail
+    -- page adds these fields the API doesn't return.
+    anunciante_code TEXT,                   -- broker's internal listing id
+    criado_em DATE,                         -- "Anúncio criado em..." date
+    detail_fetched_at DATETIME,             -- idempotency key for detail fetch
     -- Commute enrichment, ADR-010. NULL until pipeline runs.
     address_lat REAL,
     address_lng REAL,

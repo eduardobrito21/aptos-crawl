@@ -39,10 +39,33 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     _apply_schema(conn)
+    _migrate(conn)
     return conn
 
 
 def _apply_schema(conn: sqlite3.Connection) -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     conn.executescript(schema)
+    conn.commit()
+
+
+# Columns added to `aptos` after the initial schema shipped. SQLite does
+# not support `ALTER TABLE ADD COLUMN IF NOT EXISTS`, so we inspect
+# `PRAGMA table_info` and add what's missing. Append-only — never rename
+# or drop here.
+_APTOS_LATE_COLUMNS: list[tuple[str, str]] = [
+    ("descricao", "TEXT"),
+    ("amenities", "TEXT"),
+    ("extracted_at_hash", "TEXT"),
+    ("anunciante_code", "TEXT"),
+    ("criado_em", "DATE"),
+    ("detail_fetched_at", "DATETIME"),
+]
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(aptos)")}
+    for name, decl in _APTOS_LATE_COLUMNS:
+        if name not in existing:
+            conn.execute(f"ALTER TABLE aptos ADD COLUMN {name} {decl}")
     conn.commit()

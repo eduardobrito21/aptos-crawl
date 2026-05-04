@@ -28,8 +28,8 @@ PAGE_SIZE = 30
 INCLUDE_FIELDS = (
     "search("
     "result(listings(listing("
-    "id,address,usableAreas,bedrooms,suites,bathrooms,parkingSpaces,"
-    "pricingInfos),link)),"
+    "id,description,amenities,address,usableAreas,bedrooms,suites,"
+    "bathrooms,parkingSpaces,pricingInfos),link)),"
     "totalCount)"
 )
 
@@ -164,6 +164,9 @@ def _to_stub(wrapper: dict[str, Any], bairro: str) -> ListingStub:
         url = ""
     raw = json.dumps(wrapper, sort_keys=True, ensure_ascii=False)
 
+    description = listing.get("description")
+    amenities_raw = listing.get("amenities") or []
+    amenities = [str(a) for a in amenities_raw if a]
     return ListingStub(
         source="zap",
         source_id=str(listing.get("id")),
@@ -179,6 +182,8 @@ def _to_stub(wrapper: dict[str, Any], bairro: str) -> ListingStub:
         condominio=condo,
         iptu=iptu_monthly,
         total=total,
+        descricao=description if isinstance(description, str) else None,
+        amenities=amenities,
         raw_html_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
     )
 
