@@ -1,0 +1,66 @@
+# Source code location
+src = ["src"]
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+# Same as Black.
+line-length = 100
+indent-width = 4
+
+# Assume Python 3.12
+required-version = "0.15.12"
+target-version = "py312"
+
+[lint]
+select = ["B", "C4", "E", "F", "I", "N801", "N803", "NPY", "TID", "W"]
+ignore = ["B009", "B010", "E501"]
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.isort]
+known-first-party = [
+    "aptos_sp",
+]
+known-third-party = ["playwright", "pydantic", "pyyaml"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# Interesting linters to adopt:
+# FAST: FastAPI best practices
+# PTH: Prefer pathlib over os
+# PD: Pandas best practices
+# RUF: Ruff specific rules
+# TRY: Try/except best practices

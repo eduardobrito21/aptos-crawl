@@ -39,13 +39,18 @@ Filenames are `NNN-kebab-case-summary.md`, three-digit zero-padded.
 | [008](008-notion-export.md)                  | Idempotent Notion export with manual fields preserved           | Accepted |
 | [009](009-llm-enrichment.md)                 | LLM as a complementary enrichment layer                         | Proposed |
 | [010](010-google-maps-platform.md)           | Google Maps Platform for commute enrichment                     | Proposed |
+| [011](011-zap-glue-api.md)                   | ZAP scraper uses the `glue-api` JSON endpoint, not HTML         | Accepted |
+| [012](012-curl-cffi-tls-impersonation.md)    | ZAP API access via `curl_cffi` Chrome TLS impersonation         | Accepted |
 
 ## Cross-reference graph
 
 ```
 001 ←→ 005          source priority ↔ QA risk
 002 ←→ 005          Playwright config ↔ QA risk (anti-bot drives design)
+002 ←→ 011          Playwright session reused as the credentialed HTTP client
+011 ←→ 012          API target unchanged; transport swapped to curl_cffi
 003 ←→ 008          SQLite SoT ↔ Notion projection
+005 ←→ 011          auto-disable safety net ↔ undocumented internal API
 007 ←→ 009          keyword extraction ↔ LLM as complementary fallback
 009 ←→ 010          LLM enrichment ↔ commute (LLM helps with address parsing)
 ```

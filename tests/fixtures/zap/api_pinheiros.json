@@ -1,0 +1,65 @@
+{
+  "search": {
+    "result": {
+      "listings": [
+        {
+          "listing": {
+            "id": "2510042000-30",
+            "address": {
+              "street": "Rua dos Pinheiros",
+              "streetNumber": "500",
+              "neighborhood": "Pinheiros",
+              "city": "São Paulo"
+            },
+            "usableAreas": [78],
+            "bedrooms": [2],
+            "suites": [1],
+            "bathrooms": [2],
+            "parkingSpaces": [1],
+            "pricingInfos": [
+              {"price": "7800", "monthlyCondoFee": "1200", "yearlyIptu": "3600"}
+            ]
+          },
+          "link": {
+            "href": "/imovel/aluguel-apartamento-2-quartos-pinheiros-id-2510042000-30/"
+          }
+        },
+        {
+          "listing": {
+            "id": "2511099000-15",
+            "address": {
+              "street": "Rua Cardeal Arcoverde",
+              "streetNumber": "1234",
+              "neighborhood": "Pinheiros",
+              "city": "São Paulo"
+            },
+            "usableAreas": [62],
+            "bedrooms": [1],
+            "suites": [0],
+            "bathrooms": [1],
+            "parkingSpaces": [1],
+            "pricingInfos": [
+              {"price": "5500", "monthlyCondoFee": "950", "yearlyIptu": null}
+            ]
+          },
+          "link": {
+            "href": "https://www.zapimoveis.com.br/imovel/aluguel-apartamento-1-quarto-pinheiros-id-2511099000-15/"
+          }
+        },
+        {
+          "listing": {
+            "id": "missing-prices",
+            "address": {"neighborhood": "Pinheiros", "city": "São Paulo"},
+            "usableAreas": [],
+            "bedrooms": [],
+            "bathrooms": [],
+            "parkingSpaces": [],
+            "pricingInfos": []
+          },
+          "link": {"href": "/imovel/missing-prices/"}
+        }
+      ]
+    },
+    "totalCount": 3
+  }
+}
