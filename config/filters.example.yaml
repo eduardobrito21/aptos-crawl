@@ -1,0 +1,50 @@
+# Pipeline filters. Copy to config/filters.yaml and edit.
+# These values reflect the initial spec in
+# docs/product-specs/aptos-sp-spec.md.
+#
+# Per-platform URL slugs (ZAP / QA) live inside the scrapers, not
+# here — that way URL changes on ZAP don't force the operator to edit
+# this file. See ARCHITECTURE.md "Where new code goes / A new scraper".
+
+bairros:
+  - Pinheiros
+  - Itaim Bibi
+  - Vila Olímpia
+  - Vila Nova Conceição
+  - Moema
+    # `restrict_to: moema_norte` applies a sub-filter implemented in
+    # pipeline/normalize.py. Valid values documented in
+    # docs/references/sub-filters.md (to be created on implementation).
+    # restrict_to: moema_norte
+
+filters:
+  quartos_min: 1
+  quartos_max: 3
+  vagas_min: 1
+  area_min_m2: 70
+  # If the listing is "1 bedroom + office", relax to
+  # area_min_m2_flex. Logic in pipeline/normalize.py
+  # (the conditional doesn't fit in YAML alone).
+  area_min_m2_flex: 60
+  mobiliado: true
+  total_max: 11000           # rent + condo fee + IPTU
+  tipo: apartamento          # exclude flat, kitnet, studio, loft
+
+# Rate limiting (ADR-002)
+rate_limit:
+  delay_min_s: 2
+  delay_max_s: 5
+  max_concurrent_origins: 1
+  backoff_multiplier: 2
+  backoff_max_s: 60
+
+# Source toggle — disable QuintoAndar if it becomes unstable (ADR-005)
+sources:
+  zap: true
+  quintoandar: true
+
+# Enrichment toggles
+enrichment:
+  llm: false                 # ADR-009; enable once acceptance
+                             # criteria are met
+  commute_elevation: false   # ADR-010; opt-in for climb_m
