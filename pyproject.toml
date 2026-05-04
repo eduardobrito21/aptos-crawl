@@ -1,0 +1,31 @@
+[project]
+name = "aptos-sp"
+version = "0.1.0"
+description = "Local-first apartment-hunting pipeline for São Paulo (ZAP + QuintoAndar → SQLite → Notion)."
+authors = [
+    { name = "Eduardo Brito" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "curl-cffi>=0.15.0",
+    "playwright>=1.48",
+    "pydantic>=2.9",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+scrape = "aptos_sp.cli.scrape:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.15.12",
+    "basedpyright>=1.39.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.7,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

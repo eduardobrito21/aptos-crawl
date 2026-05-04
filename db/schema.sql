@@ -7,7 +7,11 @@ CREATE TABLE IF NOT EXISTS aptos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source TEXT NOT NULL,                   -- 'zap' | 'quintoandar'
     source_id TEXT NOT NULL,                -- native listing ID
-    url TEXT NOT NULL UNIQUE,
+    -- Canonical listing URL. NOT UNIQUE: ZAP republishes the same
+    -- listing under different slugs across snapshots, and the same URL
+    -- can legitimately appear with different (source, source_id) pairs.
+    -- Identity is `(source, source_id)`, not URL.
+    url TEXT NOT NULL,
     bairro TEXT,
     endereco TEXT,
     endereco_normalized TEXT,               -- ADR-006 (cross-platform dedup)
