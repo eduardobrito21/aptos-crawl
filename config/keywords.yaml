@@ -1,0 +1,78 @@
+# Keywords/regex for extracting qualitative criteria from listing
+# descriptions (ADR-007). Match case-insensitive, with accents
+# normalized.
+#
+# Keyword strings are intentionally Portuguese — they're matched
+# against Brazilian listing prose. Don't translate the values.
+#
+# Tri-state result:
+#   - positive match -> True
+#   - negative match -> False
+#   - neither        -> NULL (Eduardo confirms during virtual tour)
+#
+# Principle (ADR-007): prefer false negatives over false positives.
+
+chuveiro_gas:
+  positive:
+    - "chuveiro a gas"
+    - "chuveiro a gás"
+    - "aquecimento a gas"
+    - "aquecedor a gas"
+    - "rinnai"
+    - "agua quente a gas"
+  negative:
+    - "chuveiro eletrico"
+    - "chuveiro elétrico"
+
+chuveirinho:
+  positive:
+    - "chuveirinho"
+    - "ducha higienica"
+    - "ducha higiênica"
+    - "bide"
+  negative: []
+
+ar_condicionado:
+  positive:
+    - "ar condicionado"
+    - "ar-condicionado"
+    - "split"
+  negative:
+    - "sem ar condicionado"
+
+vidro_anti_ruido:
+  positive:
+    - "vidro anti-ruido"
+    - "vidro anti ruido"
+    - "vidro acustico"
+    - "vidro acústico"
+    - "janela acustica"
+    - "janela anti-ruido"
+    - "janela anti ruido"
+  negative: []
+
+# Special-cased in pipeline/extract.py: returns a string
+# ('isolada' | 'americana' | 'integrada' | NULL), not a boolean.
+# The loader treats cozinha_layout differently from the other keys.
+cozinha_layout:
+  isolada:
+    - "cozinha isolada"
+    - "cozinha separada"
+    - "cozinha fechada"
+  americana:
+    - "cozinha americana"
+  integrada:
+    - "cozinha integrada"
+    - "cozinha conjugada"
+    - "ambientes integrados"
+    - "sala e cozinha integradas"
+
+# `lavabo` (half-bath) is hard to infer by keyword alone: "2 banheiros"
+# is a very weak heuristic (could be two suites without a half-bath).
+# Per ADR-007 we prefer null over false positive. If ADR-009 (LLM
+# enrichment) is enabled, it resolves this from context (1 bedroom + 2
+# bathrooms + description).
+lavabo:
+  positive:
+    - "lavabo"
+  negative: []

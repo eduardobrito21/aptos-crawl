@@ -1,0 +1,15 @@
+# Destinations for commute enrichment (ADR-010 + commute-feature.md).
+# Copy to config/places.yaml and edit.
+#
+# v1 only uses `work`. Multi-POI scoring is OQ1 of ADR-010 — defer
+# until clear evidence that other POIs move the decision.
+
+work:
+  name: "BTG Pactual - Faria Lima"
+  address: "Av. Brigadeiro Faria Lima, 3477 - Itaim Bibi, São Paulo"
+  # Confirm lat/lng via the Google Maps app before running the pipeline.
+  # A few meters of error here doesn't matter — the apartment's origin
+  # is the uncertain side of the equation (see address_precision in
+  # ADR-010).
+  lat: -23.586778
+  lng: -46.681972

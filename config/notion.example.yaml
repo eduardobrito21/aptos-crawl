@@ -1,0 +1,15 @@
+# Notion target IDs. Copy to config/notion.yaml (gitignored) and fill
+# in with the operator's real workspace values.
+#
+# The token goes in .env (NOTION_TOKEN), not here.
+#
+# Prerequisite (one time): add an "External ID" property (rich_text)
+# to the database, per ADR-008.
+
+page_id: "REPLACE_ME"          # Page containing the database
+database_id: "REPLACE_ME"      # Database "Aptos SP"
+data_source_id: "REPLACE_ME"   # Data source inside the database
+
+# Property name on the database that holds <source>:<source_id>.
+# Used as the dedup key on upsert (ADR-008).
+external_id_property: "External ID"
