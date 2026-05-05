@@ -45,6 +45,13 @@ INTER_PAGE_DELAY_RANGE = (1.5, 4.0)
 class ZapScraper:
     source = "zap"
 
+    def __init__(self, *, raw: bool = False) -> None:
+        # `raw=True` drops every `filters.yaml`-mirroring server-side
+        # parameter from the request, keeping only the definitional
+        # ones (business=RENTAL, apartment-only, neighborhood). Used by
+        # the Plan 0008 audit to compare against a local-filter pass.
+        self.raw = raw
+
     def list_listings(self, config: FiltersConfig) -> list[ListingStub]:
         results: list[ListingStub] = []
         for i, bairro in enumerate(config.bairros):
@@ -58,11 +65,19 @@ class ZapScraper:
         out: list[ListingStub] = []
         last_page: int | None = None
         api_offset_cap = ZAP_API_OFFSET_LIMIT // PAGE_SIZE  # 50
+        # Plan 0008 audit found ZAP returns the occasional transient
+        # short page mid-stream (29 listings instead of 30) before
+        # going back to full 30-page-counts. Treating a single short
+        # page as "tail" caused us to exit at ~360 listings when 1400
+        # were available. Only break when we see CONSECUTIVE short
+        # or empty pages.
+        consecutive_short = 0
+        short_streak_to_stop = 3
 
         for page in range(1, min(MAX_PAGES, api_offset_cap) + 1):
             if page > 1:
                 time.sleep(random.uniform(*INTER_PAGE_DELAY_RANGE))
-            url = build_url(location, config.filters, page=page)
+            url = build_url(location, config.filters, page=page, raw=self.raw)
             try:
                 payload = fetch_json(url, headers=API_HEADERS)
             except FetchBlocked as e:
@@ -86,15 +101,18 @@ class ZapScraper:
 
             found = parse_response(payload, bairro=bairro)
             if not found:
+                # Empty page is a hard stop — natural tail.
                 break
             out.extend(found)
 
             if last_page is not None and page >= last_page:
                 break
             if len(found) < PAGE_SIZE:
-                # Defensive: fewer than PAGE_SIZE items signals the
-                # tail even if totalCount was off.
-                break
+                consecutive_short += 1
+                if consecutive_short >= short_streak_to_stop:
+                    break
+            else:
+                consecutive_short = 0
         return out
 
     def fetch_detail(self, url: str) -> ListingDetail:

@@ -62,7 +62,9 @@ def test_build_url_includes_required_params():
     assert qs["size"] == [str(PAGE_SIZE)]
     assert qs["from"] == ["0"]
     assert qs["includeFields"] == [INCLUDE_FIELDS]
-    assert qs["amenities"] == ["FURNISHED"]
+    # mobiliado is no longer sent server-side (Plan 0008: ZAP's
+    # `amenities=FURNISHED` filter is loose — handled locally now).
+    assert "amenities" not in qs
 
 
 def test_build_url_pagination_offset():
@@ -71,6 +73,17 @@ def test_build_url_pagination_offset():
     qs = parse_qs(urlparse(url).query)
     assert qs["page"] == ["3"]
     assert qs["from"] == [str(2 * PAGE_SIZE)]
+
+
+def test_build_url_never_sends_amenities():
+    """ZAP's `amenities=FURNISHED` server filter is loose (Plan 0008
+    audit: 17.8% leakage). The mobiliado check happens locally now,
+    regardless of `filters.mobiliado`."""
+    location = location_for("Moema")
+    for mob in (True, False):
+        url = build_url(location, _filters(mobiliado=mob), page=1)
+        qs = parse_qs(urlparse(url).query)
+        assert "amenities" not in qs
 
 
 def test_build_url_omits_furnished_when_disabled():
@@ -123,6 +136,30 @@ def test_build_url_applies_area_min():
     url = build_url(location, _filters(area_min_m2=70), page=1)
     qs = parse_qs(urlparse(url).query)
     assert qs["usableAreasMin"] == ["70"]
+
+
+def test_build_url_raw_mode_drops_filter_params():
+    """`raw=True` is the Plan 0008 audit knob — keep only the
+    definitional params (RENTAL, apartment, neighborhood). The one
+    exception is `parkingSpaces=0,1,2,3,4` (a no-op constraint that
+    matches every listing) — without it, ZAP caps the unfiltered
+    result set at ~380 by relevance instead of paginating to the
+    actual tail."""
+    location = location_for("Moema")
+    url = build_url(location, _filters(), page=1, raw=True)
+    qs = parse_qs(urlparse(url).query)
+    # Definitional params still present.
+    assert qs["business"] == ["RENTAL"]
+    assert qs["unitTypes"] == ["APARTMENT"]
+    assert qs["addressNeighborhood"] == ["Moema"]
+    # Pagination-unlock value matches every listing.
+    assert qs["parkingSpaces"] == ["0,1,2,3,4"]
+    # filters.yaml-mirroring params absent.
+    assert "bedrooms" not in qs
+    assert "usableAreasMin" not in qs
+    assert "rentalTotalPriceMax" not in qs
+    assert "rentTotalPrice" not in qs
+    assert "amenities" not in qs
 
 
 def test_total_count_extracted():

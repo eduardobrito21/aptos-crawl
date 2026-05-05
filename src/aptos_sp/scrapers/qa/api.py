@@ -54,8 +54,14 @@ def build_body(
     *,
     offset: int = 0,
     page_size: int = PAGE_SIZE,
+    raw: bool = False,
 ) -> dict[str, Any]:
-    """Map `filters.yaml` → QA's POST body. Mapping notes:
+    """Map `filters.yaml` → QA's POST body. With `raw=True`, drops
+    every `filters.yaml`-mirroring constraint from `houseSpecs` and
+    `priceRange`, keeping only `houseTypes=["APARTMENT"]` and the
+    business context. Used by the Plan 0008 audit.
+
+    Mapping notes:
 
     | filters.yaml          | API path                                 |
     | --------------------- | ---------------------------------------- |
@@ -70,19 +76,32 @@ def build_body(
     + IPTU together — exactly what `total_max` means in our config.
     """
     house_specs: dict[str, Any] = {
-        "area": {"range": {"min": int(filters.area_min_m2_flex)}},
+        "area": {"range": {}},
         "houseTypes": ["APARTMENT"],
-        "bedrooms": {"range": {"min": filters.quartos_min, "max": filters.quartos_max}},
+        "bedrooms": {"range": {}},
         "parkingSpace": {"range": {}},
         "bathrooms": {"range": {}},
         "suites": {"range": {}},
         "amenities": [],
         "installations": [],
     }
-    if filters.vagas_min > 0:
-        house_specs["parkingSpace"]["range"]["min"] = filters.vagas_min
-    if filters.mobiliado:
-        house_specs["isFurnished"] = True
+    price_range: list[dict[str, Any]] = []
+    if not raw:
+        house_specs["area"]["range"] = {"min": int(filters.area_min_m2_flex)}
+        house_specs["bedrooms"]["range"] = {
+            "min": filters.quartos_min,
+            "max": filters.quartos_max,
+        }
+        if filters.vagas_min > 0:
+            house_specs["parkingSpace"]["range"]["min"] = filters.vagas_min
+        if filters.mobiliado:
+            house_specs["isFurnished"] = True
+        price_range = [
+            {
+                "costType": "TOTAL_COST",
+                "range": {"min": 500, "max": int(filters.total_max)},
+            }
+        ]
 
     return {
         "slug": slug,
@@ -99,12 +118,7 @@ def build_body(
                 "neighborhoods": [],
                 "countryCode": "BR",
             },
-            "priceRange": [
-                {
-                    "costType": "TOTAL_COST",
-                    "range": {"min": 500, "max": int(filters.total_max)},
-                }
-            ],
+            "priceRange": price_range,
             "houseSpecs": house_specs,
         },
         "locationDescriptions": [{"description": slug}],
@@ -167,6 +181,10 @@ def _to_stub(source: dict[str, Any]) -> ListingStub | None:
         # without one we can't canonicalize against `config.bairros`,
         # so skip rather than guess.
         return None
+    is_furnished_raw = source.get("isFurnished")
+    is_furnished: bool | None = (
+        bool(is_furnished_raw) if isinstance(is_furnished_raw, bool) else None
+    )
 
     return ListingStub(
         source="quintoandar",
@@ -189,6 +207,7 @@ def _to_stub(source: dict[str, Any]) -> ListingStub | None:
         total=total,
         descricao=description if isinstance(description, str) else None,
         amenities=amenities_list,
+        is_furnished=is_furnished,
         raw_html_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
     )
 
