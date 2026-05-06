@@ -1,21 +1,24 @@
-"""`uv run details` — fetch ZAP detail pages and backfill the fields
-that the listings API doesn't expose.
+"""`uv run details` — fetch detail pages and backfill the fields the
+search-list / glue-api responses don't expose.
 
 Walks `aptos` rows whose `detail_fetched_at` is null or older than
 `last_seen` (i.e. the listing was re-scraped after we last grabbed
 detail) and fetches each detail page in turn. Pacing matches the
-scraper's inter-page range (1.5–4s) — Cloudflare passes via curl_cffi
+scrapers' inter-page range (1.5–4s) — Cloudflare passes via curl_cffi
 TLS impersonation per ADR-012, but we still don't want to look
 synthetic.
+
+Per-source fetcher + parser are looked up via `_HANDLERS`. Plan 0009
+adds QuintoAndar; ZAP has been there since Plan 0002.
 
 Resumable: an interrupt mid-run leaves earlier rows persisted; the
 next invocation picks up where this one stopped (rows that didn't
 update keep `detail_fetched_at IS NULL`).
 
 Flags:
-- `--limit N` — stop after N successful fetches (defaults to all).
-- `--source zap` — restrict by source (only ZAP today; reserved for
-  when QuintoAndar gets a detail fetcher).
+- `--limit N` — stop after N successful fetches across all sources.
+- `--source NAME` — restrict to one source (`zap` or `quintoandar`).
+  Defaults to all known sources.
 """
 
 import argparse
@@ -24,22 +27,41 @@ import sqlite3
 import sys
 import time
 import traceback
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from aptos_sp.db import conn as db_conn
 from aptos_sp.db import runs
-from aptos_sp.scrapers.zap.detail import (
-    DetailFetchError,
-    DetailFields,
-    fetch_detail_html,
-    parse_detail,
-)
+from aptos_sp.scrapers.base import DetailFields
+from aptos_sp.scrapers.qa import detail as qa_detail
+from aptos_sp.scrapers.zap import detail as zap_detail
 
 INTER_FETCH_DELAY_RANGE = (1.5, 4.0)
 
 
+# Per-source handler: (fetch html, parse html, fetch error type).
+# The error type lets us map source-specific 404/410 paths into
+# our shared "expired listing" branch.
+_HANDLERS: dict[
+    str, tuple[Callable[[str], str], Callable[[str], DetailFields], type[Exception]]
+] = {
+    "zap": (zap_detail.fetch_detail_html, zap_detail.parse_detail, zap_detail.DetailFetchError),
+    "quintoandar": (
+        qa_detail.fetch_detail_html,
+        qa_detail.parse_detail,
+        qa_detail.QaDetailFetchError,
+    ),
+}
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    sources = [args.source] if args.source else list(_HANDLERS)
+    for s in sources:
+        if s not in _HANDLERS:
+            print(f"unknown source: {s} (have {sorted(_HANDLERS)})", file=sys.stderr)
+            return 2
+
     conn = db_conn.connect()
     run_id = runs.start(conn, source="details")
 
@@ -48,28 +70,30 @@ def main(argv: list[str] | None = None) -> int:
     n_skipped_404 = 0
     error_summaries: list[str] = []
     try:
-        rows = _candidates(conn, source=args.source, limit=args.limit)
-        print(f"[details] {len(rows)} rows to fetch", flush=True)
+        rows = _candidates(conn, sources=sources, limit=args.limit)
+        print(f"[details] {len(rows)} rows to fetch (sources={sources})", flush=True)
         for i, row in enumerate(rows):
             if i > 0:
                 time.sleep(random.uniform(*INTER_FETCH_DELAY_RANGE))
+            fetch, parse, err_type = _HANDLERS[row["source"]]
             try:
-                html = fetch_detail_html(row["url"])
-            except DetailFetchError as e:
+                html = fetch(row["url"])
+            except err_type as e:
                 msg = str(e)
                 if "HTTP 404" in msg or "HTTP 410" in msg:
-                    # Listing expired — mark fetched so we don't retry
-                    # forever, but skip the parse.
                     _mark_fetched(conn, row["id"])
                     n_skipped_404 += 1
                     continue
                 n_errors += 1
                 if len(error_summaries) < 3:
                     error_summaries.append(msg[:160])
-                print(f"[details] {row['source_id']} ERROR: {msg[:160]}", flush=True)
+                print(
+                    f"[details] {row['source']}/{row['source_id']} ERROR: {msg[:160]}",
+                    flush=True,
+                )
                 continue
 
-            detail = parse_detail(html)
+            detail = parse(html)
             _persist(conn, row["id"], detail)
             n_fetched += 1
             if n_fetched % 50 == 0:
@@ -113,24 +137,29 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=None, help="stop after N rows")
     parser.add_argument(
         "--source",
-        default="zap",
-        help="restrict to one source (default: zap)",
+        choices=sorted(_HANDLERS),
+        default=None,
+        help="restrict to one source (default: all)",
     )
     return parser.parse_args(argv if argv is not None else sys.argv[1:])
 
 
-def _candidates(conn: sqlite3.Connection, *, source: str, limit: int | None) -> list[sqlite3.Row]:
+def _candidates(
+    conn: sqlite3.Connection, *, sources: list[str], limit: int | None
+) -> list[sqlite3.Row]:
     """Rows that need a (re-)fetch: never fetched, or last_seen advanced
-    past the previous fetch."""
-    sql = """
-        SELECT id, source_id, url, detail_fetched_at, last_seen
+    past the previous fetch. ZAP rows come first (they tend to have
+    richer descriptions; failures there are more diagnostic), then QA."""
+    placeholders = ",".join("?" * len(sources))
+    sql = f"""
+        SELECT id, source, source_id, url, detail_fetched_at, last_seen
         FROM aptos
-        WHERE source = ?
+        WHERE source IN ({placeholders})
           AND url IS NOT NULL AND url != ''
           AND (detail_fetched_at IS NULL OR detail_fetched_at < last_seen)
-        ORDER BY id
+        ORDER BY source, id
     """
-    params: list[object] = [source]
+    params: list[object] = [*sources]
     if limit is not None:
         sql += " LIMIT ?"
         params.append(limit)
@@ -140,15 +169,21 @@ def _candidates(conn: sqlite3.Connection, *, source: str, limit: int | None) -> 
 def _persist(conn: sqlite3.Connection, apto_id: int, detail: DetailFields) -> None:
     """Update the row with detail-page fields.
 
-    Detail-page values overwrite the API ones (the page is what the
-    operator sees), with `COALESCE(detail, db)` falling back to the
-    existing value when the detail parser couldn't find a field.
+    Detail-page values overwrite the search-list / API-supplied ones
+    (the detail page is what the operator sees), with
+    `COALESCE(detail, db)` falling back to the existing value when the
+    detail parser couldn't find a field.
 
-    `address_source = 'structured'` (the page has the address as
-    structured markup, not regex'd from prose). `address_precision`
-    stays NULL — we don't know without sampling whether ZAP gave us
-    rooftop or neighborhood-centroid coords for this listing; Plan
-    0005 (commute) will refine if needed.
+    `address_source = 'structured'` whenever the parser found
+    coordinates — both ZAP (Maps iframe) and QA (`address.lat/lng` in
+    the Next.js payload) expose them as structured markup.
+    `address_precision` stays NULL; Plan 0005 (commute) will refine.
+
+    `condominio` / `iptu` aren't on `aptos` (they live in
+    `precos_historico` snapshots). The detail parser still extracts
+    them on `DetailFields` for downstream use, but we don't UPDATE
+    them here — splitting QA's bundled value across snapshots is a
+    separate concern (Plan 0002 / `precos_historico` writer).
     """
     has_coords = detail.address_lat is not None and detail.address_lng is not None
     address_source = "structured" if has_coords else None
@@ -162,6 +197,12 @@ def _persist(conn: sqlite3.Connection, apto_id: int, detail: DetailFields) -> No
             address_source = COALESCE(?, address_source),
             anunciante_code = ?,
             criado_em = ?,
+            andar = COALESCE(?, andar),
+            accepts_pets = COALESCE(?, accepts_pets),
+            near_subway = COALESCE(?, near_subway),
+            tenant_service_fee = COALESCE(?, tenant_service_fee),
+            home_protection_fee = COALESCE(?, home_protection_fee),
+            construction_year = COALESCE(?, construction_year),
             detail_fetched_at = ?
         WHERE id = ?
         """,
@@ -173,6 +214,12 @@ def _persist(conn: sqlite3.Connection, apto_id: int, detail: DetailFields) -> No
             address_source,
             detail.anunciante_code,
             detail.criado_em,
+            detail.andar,
+            detail.accepts_pets,
+            detail.near_subway,
+            detail.tenant_service_fee,
+            detail.home_protection_fee,
+            detail.construction_year,
             datetime.now(UTC),
             apto_id,
         ),
