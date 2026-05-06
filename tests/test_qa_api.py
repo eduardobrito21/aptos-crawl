@@ -104,6 +104,22 @@ def test_build_body_apartment_only():
     assert body["filters"]["houseSpecs"]["houseTypes"] == ["APARTMENT"]
 
 
+def test_build_body_raw_mode_drops_filter_params():
+    """`raw=True` keeps only the definitional constraints (apartment,
+    RENT) and zeroes everything that mirrors `filters.yaml`. Plan
+    0008's audit knob."""
+    body = build_body("p", _filters(), raw=True)
+    house_specs = body["filters"]["houseSpecs"]
+    assert house_specs["houseTypes"] == ["APARTMENT"]
+    assert body["filters"]["businessContext"] == "RENT"
+    assert body["filters"]["priceRange"] == []
+    # Constraints from filters.yaml are stripped.
+    assert house_specs["area"]["range"] == {}
+    assert house_specs["bedrooms"]["range"] == {}
+    assert house_specs["parkingSpace"]["range"] == {}
+    assert "isFurnished" not in house_specs
+
+
 # --- response parsing ----------------------------------------------------
 
 

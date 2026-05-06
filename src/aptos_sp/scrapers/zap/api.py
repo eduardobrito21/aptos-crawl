@@ -29,7 +29,7 @@ INCLUDE_FIELDS = (
     "search("
     "result(listings(listing("
     "id,description,amenities,address,usableAreas,bedrooms,suites,"
-    "bathrooms,parkingSpaces,pricingInfos),link)),"
+    "bathrooms,parkingSpaces,pricingInfos,businessTypes),link)),"
     "totalCount)"
 )
 
@@ -55,9 +55,15 @@ def build_url(
     filters: Filters,
     *,
     page: int = 1,
+    raw: bool = False,
 ) -> str:
-    """Build the listings query URL for one (location, page) applying
-    `filters.yaml` server-side.
+    """Build the listings query URL for one (location, page).
+
+    With `raw=False` (default), applies every `filters.yaml` mapping
+    server-side. With `raw=True`, drops every filter that mirrors a
+    `filters.yaml` field, keeping only the definitional ones
+    (business=RENTAL, apartment-only, neighborhood). Used by the
+    Plan 0008 audit to compare against a local-filter pass.
 
     Param mapping (captured from the ZAP frontend's network tab):
 
@@ -77,9 +83,6 @@ def build_url(
     counts. The API caps at 4 (5+ bedrooms is bucketed into 4). To
     express "≥1 vaga" we send "1,2,3,4".
     """
-    bedrooms = ",".join(str(n) for n in range(filters.quartos_min, min(filters.quartos_max, 4) + 1))
-    parking = ",".join(str(n) for n in range(filters.vagas_min, 5)) if filters.vagas_min > 0 else ""
-
     params: dict[str, str | int | float] = {
         "business": "RENTAL",
         "listingType": "USED",
@@ -100,20 +103,42 @@ def build_url(
         "unitTypesV3": "APARTMENT",
         "unitSubTypes": "UnitSubType_NONE,DUPLEX,TRIPLEX",
         "usageTypes": "RESIDENTIAL",
-        "bedrooms": bedrooms,
-        "usableAreasMin": int(filters.area_min_m2),
-        "rentalTotalPriceMax": int(filters.total_max),
-        "rentTotalPrice": "true",
         "page": page,
         "size": PAGE_SIZE,
         "from": (page - 1) * PAGE_SIZE,
         "includeFields": INCLUDE_FIELDS,
         "images": "webp",
     }
-    if parking:
-        params["parkingSpaces"] = parking
-    if filters.mobiliado:
-        params["amenities"] = "FURNISHED"
+    if raw:
+        # ZAP's `glue-api` caps the unfiltered result set at ~380 by
+        # relevance ranking — adding ANY parking-spaces value (even
+        # the permissive `0,1,2,3,4`) unlocks deeper pagination
+        # (~1500). The Plan 0008 audit needs the broader set to
+        # compare server-filtered fetches against, so we send the
+        # widest possible parking value as a pagination-unlock
+        # without restricting results.
+        params["parkingSpaces"] = "0,1,2,3,4"
+    else:
+        bedrooms = ",".join(
+            str(n) for n in range(filters.quartos_min, min(filters.quartos_max, 4) + 1)
+        )
+        parking = (
+            ",".join(str(n) for n in range(filters.vagas_min, 5)) if filters.vagas_min > 0 else ""
+        )
+        params["bedrooms"] = bedrooms
+        params["usableAreasMin"] = int(filters.area_min_m2)
+        params["rentalTotalPriceMax"] = int(filters.total_max)
+        params["rentTotalPrice"] = "true"
+        if parking:
+            params["parkingSpaces"] = parking
+        # `mobiliado` deliberately NOT sent server-side. Plan 0008
+        # audit (2026-05-05) found ZAP's `amenities=FURNISHED` filter
+        # is loose: at depth ~17.8% of returned listings don't have
+        # FURNISHED in their structured amenities array. We rely on
+        # `pipeline.local_filter.is_mobiliado` against the parsed
+        # `is_furnished` flag — which IS faithful to what the API
+        # exposes, just not to whatever fuzzy signal ZAP's filter
+        # also reads.
     return f"{API_BASE}?{urlencode(params)}"
 
 
@@ -142,12 +167,24 @@ def total_count(payload: dict[str, Any]) -> int | None:
 def _to_stub(wrapper: dict[str, Any], bairro: str) -> ListingStub:
     listing = wrapper.get("listing") or {}
     addr = listing.get("address") or {}
-    pricing = _first(listing.get("pricingInfos") or [])
+    # ZAP can return *multiple* `pricingInfos` per listing (one per
+    # business type) for dual-purpose listings. Take the RENTAL one;
+    # falling through to `pricingInfos[0]` blindly was a parser bug
+    # that surfaced sale prices as monthly rents (Plan 0008 audit).
+    pricing = _pick_rental_pricing(listing.get("pricingInfos") or [])
     aluguel = _to_float(pricing.get("price")) if pricing else None
+    # Prefer ZAP's pre-computed `monthlyRentalTotalPrice` (rent + condo
+    # + IPTU normalized to monthly), then fall back to summing the
+    # parts ourselves. Their value avoids the iptuPeriod bug in the
+    # "compute it yourself" path.
+    monthly_total = (
+        _to_float((pricing.get("rentalInfo") or {}).get("monthlyRentalTotalPrice"))
+        if pricing
+        else None
+    )
     condo = _to_float(pricing.get("monthlyCondoFee")) if pricing else None
-    iptu_yearly = _to_float(pricing.get("yearlyIptu")) if pricing else None
-    iptu_monthly = (iptu_yearly / 12) if iptu_yearly is not None else None
-    total = _sum(aluguel, condo, iptu_monthly)
+    iptu_monthly = _iptu_monthly_from(pricing) if pricing else None
+    total = monthly_total or _sum(aluguel, condo, iptu_monthly)
     # The API's `includeFields` projection doesn't actually return
     # `link` (the frontend builds URLs client-side from listing data we
     # don't have). Synthesize a canonical URL from the id; ZAP's site
@@ -167,6 +204,7 @@ def _to_stub(wrapper: dict[str, Any], bairro: str) -> ListingStub:
     description = listing.get("description")
     amenities_raw = listing.get("amenities") or []
     amenities = [str(a) for a in amenities_raw if a]
+    is_furnished = "FURNISHED" in amenities if amenities_raw is not None else None
     return ListingStub(
         source="zap",
         source_id=str(listing.get("id")),
@@ -184,12 +222,45 @@ def _to_stub(wrapper: dict[str, Any], bairro: str) -> ListingStub:
         total=total,
         descricao=description if isinstance(description, str) else None,
         amenities=amenities,
+        is_furnished=is_furnished,
         raw_html_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest(),
     )
 
 
 def _first(seq: list[Any]) -> Any:
     return seq[0] if seq else None
+
+
+def _pick_rental_pricing(pricings: list[Any]) -> dict[str, Any] | None:
+    """ZAP returns one pricing entry per businessType. Pick the RENTAL
+    one; if none is explicitly tagged, fall back to the first entry
+    that has a `rentalInfo` block; otherwise the first entry."""
+    for p in pricings:
+        if isinstance(p, dict) and p.get("businessType") == "RENTAL":
+            return p
+    for p in pricings:
+        if isinstance(p, dict) and p.get("rentalInfo"):
+            return p
+    first = _first(pricings)
+    return first if isinstance(first, dict) else None
+
+
+def _iptu_monthly_from(pricing: dict[str, Any]) -> float | None:
+    """Convert IPTU to a monthly figure regardless of how ZAP encodes
+    it. The audit found listings where `iptuPeriod=MONTHLY` and the
+    `yearlyIptu` field already holds the monthly value — dividing by
+    12 there is wrong."""
+    period = (pricing.get("iptuPeriod") or "").upper()
+    if period == "MONTHLY":
+        # `iptu` is the monthly amount in this branch.
+        monthly = _to_float(pricing.get("iptu"))
+        return monthly
+    yearly = _to_float(pricing.get("yearlyIptu"))
+    if yearly is None:
+        # No period given; fall back to the legacy interpretation.
+        legacy = _to_float(pricing.get("yearlyIptu"))
+        return (legacy / 12) if legacy is not None else None
+    return yearly / 12
 
 
 def _address_str(addr: dict[str, Any]) -> str | None:

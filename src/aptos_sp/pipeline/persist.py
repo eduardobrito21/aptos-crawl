@@ -90,9 +90,9 @@ def _upsert_one(
         INSERT INTO aptos (
             source, source_id, url, bairro, endereco,
             area_m2, quartos, suites, banheiros, vagas,
-            descricao, amenities,
+            descricao, amenities, mobiliado,
             scraped_at, last_seen, raw_html_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(source, source_id) DO UPDATE SET
             url = excluded.url,
             bairro = excluded.bairro,
@@ -104,6 +104,7 @@ def _upsert_one(
             vagas = COALESCE(excluded.vagas, aptos.vagas),
             descricao = COALESCE(excluded.descricao, aptos.descricao),
             amenities = COALESCE(excluded.amenities, aptos.amenities),
+            mobiliado = COALESCE(excluded.mobiliado, aptos.mobiliado),
             last_seen = excluded.last_seen,
             raw_html_hash = excluded.raw_html_hash
         """,
@@ -120,6 +121,7 @@ def _upsert_one(
             stub.vagas,
             stub.descricao,
             amenities_json,
+            stub.is_furnished,
             stub.scraped_at,
             now,
             stub.raw_html_hash,

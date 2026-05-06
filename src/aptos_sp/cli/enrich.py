@@ -21,7 +21,9 @@ from aptos_sp.db import conn as db_conn
 from aptos_sp.db import runs
 from aptos_sp.pipeline.dedup import find_and_flag_dups
 from aptos_sp.pipeline.extract import QualitativeFields, extract_qualitative
-from aptos_sp.pipeline.normalize import area_min_with_flex, normalize_endereco
+from aptos_sp.pipeline.local_filter import passes_filters
+from aptos_sp.pipeline.normalize import normalize_endereco
+from aptos_sp.scrapers.base import ListingStub
 
 
 def main() -> int:
@@ -106,13 +108,15 @@ def _run_normalize_endereco(conn: sqlite3.Connection) -> int:
 
 
 def _run_eligibility(conn: sqlite3.Connection, filters: Filters) -> int:
-    """Set `aptos.eligible` based on `filters.yaml`. Server-side filters
-    are already applied at scrape time; this catches the outliers that
-    leak through (Plan 0001 saw 0-bedroom + R$2M/mo entries) and applies
-    the `area_min_m2_flex` rule that lives in code, not YAML."""
+    """Set `aptos.eligible` based on `filters.yaml` via the canonical
+    `passes_filters` predicate. Server-side filters at scrape time are
+    a hint, not a guarantee — this is the source of truth for what
+    actually counts as eligible (Plan 0008)."""
     cur = conn.execute(
         """
-        SELECT a.id, a.quartos, a.vagas, a.area_m2, a.descricao, a.eligible,
+        SELECT a.id, a.source, a.source_id, a.url, a.bairro, a.quartos,
+               a.vagas, a.area_m2, a.descricao, a.amenities, a.mobiliado,
+               a.eligible,
             (
                 SELECT total FROM precos_historico
                 WHERE apto_id = a.id
@@ -123,7 +127,7 @@ def _run_eligibility(conn: sqlite3.Connection, filters: Filters) -> int:
     )
     n_eligible = 0
     for row in cur.fetchall():
-        eligible = _is_eligible(row, filters)
+        eligible = passes_filters(_row_to_stub(row), filters)
         if bool(row["eligible"]) != eligible:
             conn.execute(
                 "UPDATE aptos SET eligible = ? WHERE id = ?",
@@ -135,21 +139,25 @@ def _run_eligibility(conn: sqlite3.Connection, filters: Filters) -> int:
     return n_eligible
 
 
-def _is_eligible(row: sqlite3.Row, filters: Filters) -> bool:
-    quartos = row["quartos"]
-    if quartos is None or not (filters.quartos_min <= quartos <= filters.quartos_max):
-        return False
-    vagas = row["vagas"]
-    if vagas is None or vagas < filters.vagas_min:
-        return False
-    total = row["total"]
-    if total is None or total > filters.total_max:
-        return False
-    area = row["area_m2"]
-    if area is None:
-        return False
-    floor = area_min_with_flex(filters, quartos=quartos, descricao=row["descricao"])
-    return area >= floor
+def _row_to_stub(row: sqlite3.Row) -> ListingStub:
+    """Construct a partial `ListingStub` from a stored row so the same
+    `passes_filters` predicate handles both scrape-time and DB-time
+    callers. Only the fields the predicate reads need to be accurate;
+    everything else gets a placeholder."""
+    is_furnished_raw = row["mobiliado"]
+    return ListingStub(
+        source=row["source"],
+        source_id=row["source_id"],
+        url=row["url"] or "",
+        bairro=row["bairro"] or "",
+        quartos=row["quartos"],
+        vagas=row["vagas"],
+        area_m2=row["area_m2"],
+        total=row["total"],
+        descricao=row["descricao"],
+        amenities=_decode_amenities(row["amenities"]),
+        is_furnished=bool(is_furnished_raw) if is_furnished_raw is not None else None,
+    )
 
 
 def _decode_amenities(raw: str | None) -> list[str]:

@@ -36,6 +36,11 @@ class ListingStub(BaseModel):
     total: float | None = None
     descricao: str | None = None
     amenities: list[str] = Field(default_factory=list)
+    # Source's explicit furnished flag. ZAP encodes it as
+    # `"FURNISHED"` in the amenities array; QA exposes a structured
+    # `isFurnished` boolean. Parsers normalize both to this field so
+    # the local filter has one place to look.
+    is_furnished: bool | None = None
     raw_html_hash: str | None = None
     scraped_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

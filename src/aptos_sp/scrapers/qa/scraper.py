@@ -27,10 +27,13 @@ from aptos_sp.scrapers.qa.api import API_URL, PAGE_SIZE, build_body, parse_respo
 from aptos_sp.scrapers.qa.http import QaFetchError, post_json
 from aptos_sp.scrapers.qa.locations import slug_for
 
-# Defensive ceiling on pages per bairro. With server-side filters
-# applied, no bairro returns more than ~150 listings (Plan 0004 recon),
-# so 10 pages × 50 = 500 is generous.
-MAX_PAGES = 10
+# Defensive ceiling on pages per bairro. QA's apigw rejects
+# `offset > 1000`, so 20 pages × 50/page = 1000 is the natural
+# ceiling. With server-side filters we typically land well under
+# (Plan 0004 saw ~150-190 per slug query); the cap matters mostly in
+# `raw=True` mode (Plan 0008) where unfiltered slug queries can run
+# into the four-digit range.
+MAX_PAGES = 20
 
 INTER_BAIRRO_DELAY_RANGE = (5.0, 12.0)
 INTER_PAGE_DELAY_RANGE = (1.5, 4.0)
@@ -38,6 +41,13 @@ INTER_PAGE_DELAY_RANGE = (1.5, 4.0)
 
 class QaScraper:
     source = "quintoandar"
+
+    def __init__(self, *, raw: bool = False) -> None:
+        # `raw=True` drops every `filters.yaml`-mirroring server-side
+        # parameter from the request body, keeping only the
+        # definitional constraints (apartment-only, RENT). Used by the
+        # Plan 0008 audit.
+        self.raw = raw
 
     def list_listings(self, config: FiltersConfig) -> list[ListingStub]:
         targets = list(config.bairros)
@@ -72,7 +82,7 @@ class QaScraper:
             if page > 1:
                 time.sleep(random.uniform(*INTER_PAGE_DELAY_RANGE))
             offset = (page - 1) * PAGE_SIZE
-            body = build_body(slug, filters, offset=offset, page_size=PAGE_SIZE)
+            body = build_body(slug, filters, offset=offset, page_size=PAGE_SIZE, raw=self.raw)
             try:
                 payload = post_json(API_URL, body)
             except QaFetchError:
