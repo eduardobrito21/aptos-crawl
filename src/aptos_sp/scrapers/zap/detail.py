@@ -25,11 +25,12 @@ pages too, so the same fingerprint trick from ADR-012 applies here.
 """
 
 import re
-from dataclasses import dataclass
 from datetime import date
 from urllib.parse import parse_qs, urlparse
 
 from curl_cffi import requests as curl_requests
+
+from aptos_sp.scrapers.base import DetailFields
 
 DETAIL_TIMEOUT_S = 30
 DETAIL_IMPERSONATE = "chrome124"
@@ -103,16 +104,6 @@ _MONTHS_PT = {
     "novembro": 11,
     "dezembro": 12,
 }
-
-
-@dataclass
-class DetailFields:
-    description: str | None
-    anunciante_code: str | None
-    criado_em: date | None
-    endereco: str | None
-    address_lat: float | None
-    address_lng: float | None
 
 
 class DetailFetchError(RuntimeError):

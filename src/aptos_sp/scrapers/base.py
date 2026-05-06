@@ -5,7 +5,8 @@ iterate sources without knowing platform details. Detail-page enrichment
 (Plan 0002) will use `fetch_detail`; M1 only uses `list_listings`.
 """
 
-from datetime import UTC, datetime
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
 from typing import Protocol
 
 from pydantic import BaseModel, Field
@@ -52,6 +53,40 @@ class ListingDetail(BaseModel):
     description: str | None = None
     photos: list[str] = Field(default_factory=list)
     raw_html_hash: str | None = None
+
+
+@dataclass
+class DetailFields:
+    """Source-specific detail-page fields, normalized so `cli/details`
+    can persist any source's output through the same code path. Each
+    source's `parse_detail` returns one of these.
+
+    None means "the page didn't expose this for this listing"; the
+    persist step uses `COALESCE(detail, db)` to keep prior values.
+    Some fields (the QA-only block below) are still None for ZAP
+    today — when ZAP's detail page exposes the equivalent we'll
+    populate them too.
+    """
+
+    description: str | None = None
+    anunciante_code: str | None = None
+    criado_em: date | None = None
+    endereco: str | None = None
+    address_lat: float | None = None
+    address_lng: float | None = None
+    photos: list[str] = field(default_factory=list)
+    # QA detail also exposes the price split (the search-list bundles
+    # condo + iptu) and several qualitative flags. ZAP's detail page
+    # has equivalents but they're already on the listings API so the
+    # detail parser doesn't bother re-emitting them.
+    condominio: float | None = None
+    iptu: float | None = None
+    andar: str | None = None
+    accepts_pets: bool | None = None
+    near_subway: bool | None = None
+    tenant_service_fee: float | None = None
+    home_protection_fee: float | None = None
+    construction_year: int | None = None
 
 
 class Scraper(Protocol):

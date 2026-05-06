@@ -42,6 +42,14 @@ CREATE TABLE IF NOT EXISTS aptos (
     anunciante_code TEXT,                   -- broker's internal listing id
     criado_em DATE,                         -- "Anúncio criado em..." date
     detail_fetched_at DATETIME,             -- idempotency key for detail fetch
+    -- QA detail-page extras (Plan 0009 part 2). ZAP exposes some of
+    -- these on the listings API so its detail parser doesn't repeat
+    -- them; for QA the detail page is the only public surface.
+    accepts_pets BOOLEAN,
+    near_subway BOOLEAN,
+    tenant_service_fee REAL,
+    home_protection_fee REAL,
+    construction_year INTEGER,
     -- Commute enrichment, ADR-010. NULL until pipeline runs.
     address_lat REAL,
     address_lng REAL,

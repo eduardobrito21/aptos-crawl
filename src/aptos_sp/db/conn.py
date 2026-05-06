@@ -60,6 +60,11 @@ _APTOS_LATE_COLUMNS: list[tuple[str, str]] = [
     ("anunciante_code", "TEXT"),
     ("criado_em", "DATE"),
     ("detail_fetched_at", "DATETIME"),
+    ("accepts_pets", "BOOLEAN"),
+    ("near_subway", "BOOLEAN"),
+    ("tenant_service_fee", "REAL"),
+    ("home_protection_fee", "REAL"),
+    ("construction_year", "INTEGER"),
 ]
 
 
