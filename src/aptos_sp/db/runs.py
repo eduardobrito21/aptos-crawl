@@ -11,6 +11,11 @@ from typing import Literal
 
 RunStatus = Literal["success", "failed", "partial", "disabled"]
 
+# ADR-005 §2: a source auto-disables after this many consecutive failed
+# runs. Operator clears the disable by editing the `runs` table or
+# (future) running with `--reset-source-disable`.
+AUTO_DISABLE_THRESHOLD = 3
+
 
 def start(conn: sqlite3.Connection, source: str) -> int:
     cur = conn.execute(
@@ -20,6 +25,32 @@ def start(conn: sqlite3.Connection, source: str) -> int:
     conn.commit()
     assert cur.lastrowid is not None
     return int(cur.lastrowid)
+
+
+def is_disabled(conn: sqlite3.Connection, source: str) -> bool:
+    """ADR-005 §2: a source is auto-disabled after `AUTO_DISABLE_THRESHOLD`
+    consecutive failed runs. Returns True when the *most recent* run
+    for that source has `status='disabled'`, OR when the last
+    `AUTO_DISABLE_THRESHOLD` finished runs were all `failed`.
+
+    The first form prevents repeated retries once a disable has been
+    written; the second form is the trigger for writing the next
+    `disabled` row at start of run.
+    """
+    last_finished = conn.execute(
+        """
+        SELECT status FROM runs
+        WHERE source = ? AND status IS NOT NULL
+        ORDER BY id DESC LIMIT ?
+        """,
+        (source, AUTO_DISABLE_THRESHOLD),
+    ).fetchall()
+    statuses = [row["status"] for row in last_finished]
+    if statuses and statuses[0] == "disabled":
+        return True
+    if len(statuses) >= AUTO_DISABLE_THRESHOLD and all(s == "failed" for s in statuses):
+        return True
+    return False
 
 
 def finish(

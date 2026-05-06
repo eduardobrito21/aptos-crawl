@@ -1,0 +1,282 @@
+{
+  "engine_timed_out": false,
+  "search_id": "807f8c83-5014-4372-b08d-aff80dc2792c",
+  "took": 36,
+  "hits": {
+    "hits": [
+      {
+        "_id": "893327546",
+        "_score": 50.0,
+        "_source": {
+          "id": 893327546,
+          "type": "Apartamento",
+          "area": 106,
+          "bathrooms": 2,
+          "bedrooms": 3,
+          "suites": 1,
+          "parkingSpaces": 1,
+          "amenities": [
+            "MESAS_E_CADEIRAS_DE_ESCRITORIO",
+            "ESPELHO_NO_BANHEIRO",
+            "VARAL_DE_ROUPAS",
+            "MICROONDAS",
+            "FOGAO_INCLUSO",
+            "CAMA_DE_CASAL",
+            "CAMA_DE_SOLTEIRO",
+            "AREA_DE_SERVICO",
+            "TANQUE",
+            "ENERGIA",
+            "VARANDA",
+            "CLOSET",
+            "GELADEIRA_INCLUSO",
+            "ACESSO_SEM_DEGRAUS",
+            "MESAS_E_CADEIRAS_DE_JANTAR",
+            "MAQUINA_DE_LAVAR",
+            "TOMADAS_NOVAS",
+            "ARMARIOS_NOS_BANHEIROS",
+            "AR_CONDICIONADO",
+            "BOX",
+            "CORTINAS_DECORATIVAS",
+            "SOFA",
+            "ARMARIOS_EMBUTIDOS_NO_QUARTO",
+            "SOL_DA_MANHA",
+            "ARMARIOS_NA_COZINHA",
+            "LUMINOSIDADE_NATURAL",
+            "CHUVEIRO_ELETRICO"
+          ],
+          "installations": [
+            "GAS_ENCANADO",
+            "PERTO_DE_METRO_OU_TREM"
+          ],
+          "totalCost": 10109,
+          "rent": 7200,
+          "iptuPlusCondominium": 2631,
+          "address": "Rua Oscar Freire",
+          "neighbourhood": "Pinheiros",
+          "regionName": "Pinheiros",
+          "isSecondaryHouse": false,
+          "forRent": true,
+          "forSale": false,
+          "isFurnished": true,
+          "shortRentDescription": "Alugar apartamento mobiliado com 3 quartos, 1 suíte."
+        },
+        "fields": {
+          "listingTags": []
+        },
+        "orderedImageList": [],
+        "filtersMatchTag": {
+          "type": "FULL",
+          "label": "Tem tudo que você busca",
+          "title": "O imóvel tem tudo que você busca!",
+          "description": "*Filtros que encontramos:*\nApartamento • 1+ quartos • 1+ vagas • Até R$ 11000 • Mobiliado • A partir de 70 m²",
+          "meta": {
+            "totalFilters": 7,
+            "matchedFilters": 7,
+            "unmatchedFilters": 0
+          }
+        },
+        "scoreMatchTag": [
+          "SAME_NEIGHBORHOOD_MATCH"
+        ],
+        "matched_queries": [
+          "GEO_LOCATION_EXACT_MATCH_NEIGHBORHOOD_0",
+          "GEO_LOCATION_VIEWPORT_MATCH_NEIGHBORHOOD_0"
+        ]
+      },
+      {
+        "_id": "892776969",
+        "_score": 50.0,
+        "_source": {
+          "id": 892776969,
+          "type": "Apartamento",
+          "area": 82,
+          "bathrooms": 2,
+          "bedrooms": 2,
+          "suites": 0,
+          "parkingSpaces": 1,
+          "amenities": [
+            "QUARTOS_E_CORREDORES_COM_PORTAS_AMPLAS",
+            "MAQUINA_DE_LAVAR",
+            "ARMARIOS_NOS_BANHEIROS",
+            "MICROONDAS",
+            "BOX",
+            "FOGAO_INCLUSO",
+            "CAMA_DE_CASAL",
+            "AREA_DE_SERVICO",
+            "CAMA_DE_SOLTEIRO",
+            "UTENSILIOS_DE_COZINHA",
+            "VENTILADOR_DE_TETO",
+            "TANQUE",
+            "SOFA",
+            "RUA_SILENCIOSA",
+            "ARMARIOS_EMBUTIDOS_NO_QUARTO",
+            "GELADEIRA_INCLUSO",
+            "BANHEIRO_DE_SERVICO",
+            "SOL_DA_MANHA",
+            "ARMARIOS_NA_COZINHA",
+            "LUMINOSIDADE_NATURAL",
+            "QUARTO_DE_SERVICO",
+            "MESAS_E_CADEIRAS_DE_JANTAR",
+            "TELEVISAO"
+          ],
+          "installations": [
+            "SALAO_DE_FESTAS",
+            "CORRIMAO",
+            "ACADEMIA",
+            "VAGA_DE_GARAGEM_ACESSIVEL",
+            "QUADRA_ESPORTIVA",
+            "PERTO_DE_METRO_OU_TREM"
+          ],
+          "totalCost": 6807,
+          "rent": 5200,
+          "iptuPlusCondominium": 1407,
+          "address": "Rua Alves Guimaraes",
+          "neighbourhood": "Pinheiros",
+          "regionName": "Pinheiros",
+          "isSecondaryHouse": false,
+          "forRent": true,
+          "forSale": true,
+          "isFurnished": true,
+          "shortRentDescription": "Alugar apartamento mobiliado em Pinheiros, 2 quartos."
+        },
+        "fields": {
+          "listingTags": []
+        },
+        "orderedImageList": [],
+        "filtersMatchTag": {
+          "type": "FULL",
+          "label": "Tem tudo que você busca",
+          "title": "O imóvel tem tudo que você busca!",
+          "description": "*Filtros que encontramos:*\nApartamento • 1+ quartos • 1+ vagas • Até R$ 11000 • Mobiliado • A partir de 70 m²",
+          "meta": {
+            "totalFilters": 7,
+            "matchedFilters": 7,
+            "unmatchedFilters": 0
+          }
+        },
+        "scoreMatchTag": [
+          "SAME_NEIGHBORHOOD_MATCH"
+        ],
+        "matched_queries": [
+          "GEO_LOCATION_EXACT_MATCH_NEIGHBORHOOD_0",
+          "GEO_LOCATION_VIEWPORT_MATCH_NEIGHBORHOOD_0"
+        ]
+      },
+      {
+        "_id": "892770588",
+        "_score": 50.0,
+        "_source": {
+          "id": 892770588,
+          "type": "Apartamento",
+          "area": 105,
+          "bathrooms": 2,
+          "bedrooms": 3,
+          "suites": 0,
+          "parkingSpaces": 2,
+          "amenities": [
+            "ARMARIOS_EMBUTIDOS_NO_QUARTO",
+            "ARMARIOS_NA_COZINHA",
+            "ARMARIOS_NOS_BANHEIROS",
+            "BANHEIRO_DE_SERVICO",
+            "GARAGEM_FIXA",
+            "PODE_TER_ANIMAIS_DE_ESTIMACAO",
+            "QUARTO_DE_SERVICO"
+          ],
+          "installations": [
+            "PERTO_DE_METRO_OU_TREM"
+          ],
+          "totalCost": 6057,
+          "rent": 3500,
+          "iptuPlusCondominium": 2422,
+          "address": "Rua Capote Valente",
+          "neighbourhood": "Pinheiros",
+          "regionName": "Pinheiros",
+          "isSecondaryHouse": false,
+          "forRent": true,
+          "forSale": false,
+          "isFurnished": true,
+          "shortRentDescription": "Apartamento mobiliado com 3 quartos em Pinheiros para alugar."
+        },
+        "fields": {
+          "listingTags": []
+        },
+        "orderedImageList": [],
+        "filtersMatchTag": {
+          "type": "FULL",
+          "label": "Tem tudo que você busca",
+          "title": "O imóvel tem tudo que você busca!",
+          "description": "*Filtros que encontramos:*\nApartamento • 1+ quartos • 1+ vagas • Até R$ 11000 • Mobiliado • A partir de 70 m²",
+          "meta": {
+            "totalFilters": 7,
+            "matchedFilters": 7,
+            "unmatchedFilters": 0
+          }
+        },
+        "scoreMatchTag": [
+          "SAME_NEIGHBORHOOD_MATCH"
+        ],
+        "matched_queries": [
+          "GEO_LOCATION_EXACT_MATCH_NEIGHBORHOOD_0",
+          "GEO_LOCATION_VIEWPORT_MATCH_NEIGHBORHOOD_0"
+        ]
+      }
+    ],
+    "max_score": 50.0,
+    "total": {
+      "relation": "Eq",
+      "value": 99
+    }
+  },
+  "location": {
+    "id": "ChIJjyYWy5hXzpQRCDea46MUQKk",
+    "source": "GEOCODE_GOOGLE",
+    "locationContext": "NEIGHBORHOOD",
+    "viewport": {
+      "north": -23.549484,
+      "south": -23.5745283,
+      "east": -46.6714005,
+      "west": -46.7054852
+    },
+    "neighborhood": "Pinheiros",
+    "city": "São Paulo",
+    "state": "SP",
+    "country": "Brasil",
+    "center": {
+      "lat": -23.5635787,
+      "lng": -46.6916068
+    },
+    "address": "Pinheiros, São Paulo - SP, Brasil",
+    "regionAvailable": true
+  },
+  "locationInfo": {
+    "locations": [
+      {
+        "id": "ChIJjyYWy5hXzpQRCDea46MUQKk",
+        "source": "GEOCODE_GOOGLE",
+        "locationContext": "NEIGHBORHOOD",
+        "viewport": {
+          "north": -23.549484,
+          "south": -23.5745283,
+          "east": -46.6714005,
+          "west": -46.7054852
+        },
+        "neighborhood": "Pinheiros",
+        "city": "São Paulo",
+        "state": "SP",
+        "country": "Brasil",
+        "center": {
+          "lat": -23.5635787,
+          "lng": -46.6916068
+        },
+        "address": "Pinheiros, São Paulo - SP, Brasil",
+        "regionAvailable": true
+      }
+    ],
+    "joinedViewport": {
+      "north": -23.549484,
+      "south": -23.5745283,
+      "east": -46.6714005,
+      "west": -46.7054852
+    }
+  }
+}
